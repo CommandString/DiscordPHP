@@ -342,6 +342,13 @@ class Discord
     private $application_commands;
 
     /**
+     * Whether this instance is in a rest only state
+     * 
+     * @var bool
+     */
+    protected $restOnly;
+
+    /**
      * Creates a Discord client instance.
      *
      * @param  array           $options Array of options.
@@ -364,6 +371,7 @@ class Discord
         $this->token = $options['token'];
         $this->loop = $options['loop'];
         $this->logger = $options['logger'];
+        $this->restOnly = $options['restOnly'];
 
         $this->logger->debug('Initializing DiscordPHP '.self::VERSION.' (DiscordPHP-Http: '.Http::VERSION.' & Gateway: v'.self::GATEWAY_VERSION.') on PHP '.PHP_VERSION);
 
@@ -396,6 +404,12 @@ class Discord
         $this->client = $this->factory->part(Client::class, []);
 
         $this->connectWs();
+
+        if ($this->restOnly) {
+            $this->once("init", function () {
+                $this->ws->close(Op::CLOSE_NORMAL, 'Closing websocket connection for rest only mode!');
+            });
+        }
     }
 
     /**
@@ -700,7 +714,7 @@ class Discord
 
         if (in_array($op, Op::getCriticalCloseCodes())) {
             $this->logger->error('not reconnecting - critical op code', ['op' => $op, 'reason' => $reason]);
-        } else {
+        } else if (!$this->restOnly) {
             $this->logger->warning('reconnecting in 2 seconds');
 
             $this->loop->addTimer(2, function () {
@@ -1394,6 +1408,7 @@ class Discord
                 'socket_options',
                 'dnsConfig',
                 'cache',
+                'restOnlu'
             ])
             ->setDefaults([
                 'logger' => null,
@@ -1404,6 +1419,7 @@ class Discord
                 'intents' => Intents::getDefaultIntents(),
                 'socket_options' => [],
                 'cache' => new ArrayCache(),
+                'restOnly' => false
             ])
             ->setAllowedTypes('token', 'string')
             ->setAllowedTypes('logger', ['null', LoggerInterface::class])
@@ -1414,6 +1430,7 @@ class Discord
             ->setAllowedTypes('retrieveBans', 'bool')
             ->setAllowedTypes('intents', ['array', 'int'])
             ->setAllowedTypes('socket_options', 'array')
+            ->setAllowedTypes('restOnly', 'bool')
             ->setAllowedTypes('dnsConfig', ['string', \React\Dns\Config\Config::class])
             ->setAllowedTypes('cache', ['array', CacheConfig::class, \React\Cache\CacheInterface::class, \Psr\SimpleCache\CacheInterface::class])
             ->setNormalizer('cache', function ($options, $value) {
