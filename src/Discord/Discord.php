@@ -1408,7 +1408,7 @@ class Discord
                 'socket_options',
                 'dnsConfig',
                 'cache',
-                'restOnlu'
+                'restOnly'
             ])
             ->setDefaults([
                 'logger' => null,
